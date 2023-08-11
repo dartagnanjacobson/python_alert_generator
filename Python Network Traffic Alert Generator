@@ -1,0 +1,37 @@
+from scapy.all import sniff
+from collections import Counter
+
+# Tracking the number of packets per destination port
+port_counter = Counter()
+# Threshold for a sudden increase in traffic (arbitrary number)
+TRAFFIC_SPIKE_THRESHOLD = 100
+# Last number of packets processed
+last_packet_count = 0
+
+def alert(message):
+    print(f'ALERT: {message}')
+
+def analyze_packet(packet):
+    global last_packet_count
+
+    # Check if the packet has the TCP layer
+    if packet.haslayer('TCP'):
+        dst_port = packet['TCP'].dport
+        port_counter[dst_port] += 1
+
+        # Print basic network metrics
+        print(f"Total packets: {sum(port_counter.values())}")
+        print(f"Top 5 destination ports: {port_counter.most_common(5)}")
+
+        # Check for a sudden increase in traffic
+        if sum(port_counter.values()) - last_packet_count > TRAFFIC_SPIKE_THRESHOLD:
+            alert('Sudden spike in network traffic detected')
+
+        last_packet_count = sum(port_counter.values())
+
+        # Check for uncommon destination ports (e.g., above 1024, excluding some common ones like 8080)
+        if dst_port > 1024 and dst_port not in [8080]:
+            alert(f'Uncommon destination port detected: {dst_port}')
+
+# Sniff the network traffic and apply the analyze_packet function to each packet
+sniff(prn=analyze_packet)
